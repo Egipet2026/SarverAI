@@ -1,0 +1,27 @@
+services:
+  backend:
+    image: node:22-slim
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+    command: sh -c "npm install && npx tsx watch src/index.ts"
+    restart: unless-stopped
+
+  frontend:
+    image: node:22-slim
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:5173"
+    environment:
+      - NODE_ENV=development
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+    depends_on:
+      - backend
+    command: sh -c "npm install && npx vite --host 0.0.0.0 --port 5173"
+    restart: unless-stopped
