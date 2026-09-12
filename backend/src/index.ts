@@ -1,6 +1,6 @@
 // ── SarverAI Backend Server ──
 
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { SarverEngine } from './engine/engine.js';
 
@@ -10,6 +10,15 @@ const engine = new SarverEngine();
 
 app.use(cors());
 app.use(express.json());
+
+// Handle malformed JSON bodies gracefully
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    res.status(400).json({ error: 'Invalid JSON body' });
+    return;
+  }
+  _next(err);
+});
 
 // Health check
 app.get('/health', (_req, res) => {
