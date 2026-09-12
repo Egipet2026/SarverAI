@@ -3,6 +3,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { SarverEngine } from './engine/engine.js';
+import { getAllSessions, getSession, createSession, addMessageToSession, deleteSession } from './engine/storage.js';
 
 const app = express();
 const PORT = 8000;
@@ -25,22 +26,58 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', model: 'SarverAI v1.0', running: true });
 });
 
-// Chat endpoint
+// List all sessions
+app.get('/sessions', (_req, res) => {
+  res.json(getAllSessions());
+});
+
+// Get a single session with messages
+app.get('/sessions/:id', (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+  res.json(session);
+});
+
+// Delete a session
+app.delete('/sessions/:id', (req, res) => {
+  deleteSession(req.params.id);
+  res.json({ status: 'deleted' });
+});
+
+// Chat endpoint — saves messages to a session
 app.post('/chat', (req, res) => {
-  const { message, history } = req.body as { message: string; history?: unknown[] };
+  const { message, sessionId } = req.body as { message: string; sessionId?: string };
 
   if (!message || typeof message !== 'string') {
     res.status(400).json({ error: 'Message is required' });
     return;
   }
 
+  // Create or reuse session
+  let session = sessionId ? getSession(sessionId) : null;
+  if (!session) {
+    session = createSession();
+  }
+
+  // Save user message
+  addMessageToSession(session.id, { role: 'user', content: message, timestamp: new Date().toISOString() });
+
+  // Process with AI engine
   const result = engine.process(message);
+
+  // Save AI response
+  const updated = addMessageToSession(session.id, { role: 'ai', content: result.response, timestamp: new Date().toISOString() });
 
   res.json({
     response: result.response,
     intent: result.intent,
     language: result.language,
     thinkingMs: result.thinkingMs,
+    sessionId: session.id,
+    sessionTitle: updated?.title || session.title,
   });
 });
 
